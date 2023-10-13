@@ -25,7 +25,6 @@ def clean_email(email):
             return cleaned_email[0]  # Return the first extracted email
     return None  # Return None for non-string values or if no valid email is found
 
-
 # Function to verify a single email using GMass API
 def verify_email(email):
     global i
@@ -58,21 +57,9 @@ def verify_email(email):
 
 # Function to verify emails using multiple threads
 def verify_emails_parallel(input_filename, output_filename):
-    flag = False
-    while not flag:
-        try:
-            if input_filename.endswith(".csv"):
-                input_data = pd.read_csv(input_filename, encoding='latin-1')
-            elif input_filename.endswith(".xlsx"):
-                input_data = pd.read_excel(input_filename)
-            else:
-                print(f"Unsupported file format: {input_filename}")
-                return
 
-            emails_to_verify = input_data["Email"].tolist()
-            flag = True
-        except:
-            time.sleep(5)
+    emails_to_verify = read_file(input_filename)
+    emails_verified = read_file(output_filename)
 
     results = []
     print(len(emails_to_verify))
@@ -126,6 +113,19 @@ def process_new_files():
             os.rename(file_to_process, original_file)
         break
         # time.sleep(3600)  # Sleep for an hour
+def read_file(file_name):
+    while True:
+        try:
+            if file_name.endswith(".csv"):
+                input_data = pd.read_csv(file_name, encoding='latin-1')
+            elif file_name.endswith(".xlsx"):
+                input_data = pd.read_excel(file_name)
+            else:
+                print(f"Unsupported file format: {file_name}")
+                return []
+            return input_data["Email"].tolist()
+        except:
+            time.sleep(5)
 
 if __name__ == "__main__":
     process_new_files()
