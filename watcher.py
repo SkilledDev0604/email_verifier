@@ -9,7 +9,7 @@ class FileWatcher(FileSystemEventHandler):
             # Call your existing script with the input and output folder paths
             input_folder = './input'
             output_folder = './output'
-            subprocess.run(['python', 'verify.py', input_folder, output_folder])
+            subprocess.run(['python3', 'verify.py', input_folder, output_folder])
 
 if __name__ == "__main__":
     input_folder = './input'
