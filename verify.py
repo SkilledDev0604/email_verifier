@@ -25,6 +25,13 @@ def clean_email(email):
             return cleaned_email[0]  # Return the first extracted email
     return None  # Return None for non-string values or if no valid email is found
 
+
+# Function to filter emails by removing verified emails
+def filter_emails(emails_to_verify, verified_emails):
+
+    return [obj for obj in emails_to_verify if all(obj['Email'] != obj2['Email'] for obj2 in verified_emails)]
+ # Return the first extracted email
+
 # Function to verify a single email using GMass API
 def verify_email(email):
     global i
@@ -34,7 +41,7 @@ def verify_email(email):
         time.sleep(3600)  # Sleep for an hour
     try:
         # Build the API URL with the email and API key
-        url = f"{GMASS_API_URL}?email={email}&key={GMASS_API_KEY}"
+        url = f"{GMASS_API_URL}?email={email['Email']}&key={GMASS_API_KEY}"
         response = requests.get(url)
         result = response.json()
         print("Count: ", i, " ", result)
@@ -48,37 +55,43 @@ def verify_email(email):
                 verification_status = "Invalid"
         else:
             verification_status = "Could not verify"
-
-        return {"Email": email, "Verification Status": verification_status, "Response": result}
+        email['Verification Status'] = verification_status
+        email['Response'] = result
+        return email
     except Exception as e:
         i += 1
         print(f"Error {i} verifying {email}: {str(e)}")
-        return {"Email": email, "Verification Status": "ERROR"}
+        email['Verification Status'] = "ERROR"
+        email['Response'] = ''
+        return email
 
 # Function to verify emails using multiple threads
 def verify_emails_parallel(input_filename, output_filename):
 
     emails_to_verify = read_file(input_filename)
-    emails_verified = read_file(output_filename)
+    verified_emails = read_file(output_filename)
 
     results = []
     print(len(emails_to_verify))
 
+    
     # Clean the emails before verification
     cleaned_emails = [clean_email(email) for email in emails_to_verify]
 
     # Remove None values (invalid emails) from the list
     cleaned_emails = [email for email in cleaned_emails if email]
 
+    filtered_emails = filter_emails(emails_to_verify, verified_emails)
+
     results = []
-    print(len(cleaned_emails))
+    print(len(filtered_emails))
 
     # valid_emails = re.findall(r'[\w\.-]+@[\w\.-]+', input_data["Email"])
 
     with ThreadPoolExecutor(max_workers=50) as executor:  # Adjust max_workers as needed
-        results = list(executor.map(verify_email, cleaned_emails))
+        results = list(executor.map(verify_email, filtered_emails))
 
-    output_data = pd.DataFrame(results)
+    output_data = pd.DataFrame(verified_emails + results)
     output_data.to_csv(output_filename, index=False)
 
 # Function to process new CSV and XLSX files
@@ -123,7 +136,8 @@ def read_file(file_name):
             else:
                 print(f"Unsupported file format: {file_name}")
                 return []
-            return input_data["Email"].tolist()
+            df = pd.DataFrame(input_data)
+            return df.to_dict(orient='list')
         except:
             time.sleep(5)
 
