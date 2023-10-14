@@ -6,6 +6,14 @@ from watchdog.events import FileSystemEventHandler
 class FileWatcher(FileSystemEventHandler):
     def on_modified(self, event):
         if not event.is_directory:
+            # Read the requests to pass to B script
+            # with open('request.txt', 'r') as file:
+            #     number_of_requests = int(file.read().strip())
+
+            # Stop the B script if it's running
+            subprocess.run(['pkill', '-f', 'verify.py'])
+            time.sleep(1)  # Wait for the process to be terminated
+
             # Call your existing script with the input and output folder paths
             input_folder = './input'
             output_folder = './output'
