@@ -7,6 +7,7 @@ import asyncio
 import aiohttp
 import json
 import random
+import psycopg2
 from typing import List, Dict, Union
 from datetime import datetime, timedelta
 
@@ -16,6 +17,32 @@ GMASS_API_KEY = API_KEY
 
 INPUT_FOLDER = sys.argv[1]
 OUTPUT_FOLDER = sys.argv[2]
+
+
+def seperate_emails(emails, verified_domains):
+    verified_emails = [email for email in emails for verified_domain  in verified_domains if verified_domain['domain'] == get_domain(email)]
+    unverified_emails = [email for email in emails if email not in verified_emails]
+    catch_all_emails = [email for email in verified_emails for verified_domain  in verified_domains if verified_domain['domain'] == get_domain(email) and verified_domain['catch_all'] == True]
+    not_catch_all_emails = [email for email in verified_emails if email not in catch_all_emails]
+    return (unverified_emails, not_catch_all_emails, catch_all_emails)
+
+def connect_to_database():
+    try:
+        conn = psycopg2.connect(
+            database="domains",
+            user="ubuntu_user",
+            password="123456",
+            host="50.17.66.85",
+            port=5432,
+        )
+        print("Connected to the database")
+        return conn
+    except (psycopg2.Error, KeyError) as e:
+        print(f"Error connecting to the database: {e}")
+
+
+def get_domain(email:str) -> str:
+    return email.split("@")[1]
 
 
 async def get_response(email: str) -> Dict:
@@ -114,14 +141,26 @@ def remove_unverified_emails(
         if email["Verification Status"] not in ["Invalid", "Valid"]
     ]
 
+def get_all_domains(conn) :
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM domains WHERE catch_all = TRUE;"
+            )
+            catch_all_domains = cur.fetchall()
+
+    except psycopg2.Error as e:
+        print(f"Error inserting songs: {e}")
+
 async def verify_emails_parallel(
-    input_filenames: List[str], output_filename: str
+    input_filenames: List[str], output_filename: str, conn
 ) -> None:
     emails_to_verify = [
         element
         for input_filename in input_filenames
         for element in read_file(input_filename)
     ]
+    verified_domains = 
     verified_emails = (
         read_file(output_filename) if os.path.exists(output_filename) else []
     )
@@ -192,7 +231,7 @@ def get_folder_size(folder_path):
     return total_size
 
 
-async def process_new_files() -> None:
+async def process_new_files(conn) -> None:
     supported_file_extensions = (".csv", ".xlsx")
     files_to_process = []
 
@@ -209,7 +248,7 @@ async def process_new_files() -> None:
     ]
     output_file = os.path.join(OUTPUT_FOLDER, "verified_emails.csv")
 
-    verified_emails = await verify_emails_parallel(files_to_process, output_file)
+    verified_emails = await verify_emails_parallel(files_to_process, output_file, conn)
 
     for file_to_process in files_to_process:
         emails = read_file(file_to_process)
@@ -241,9 +280,13 @@ async def process_new_files() -> None:
 
 
 async def main() -> None:
-    print("Verifying emails...")
-    await process_new_files()
-    print("Verification completed.")
+    conn = connect_to_database()
+    if conn:
+        print("Verifying emails...")
+        await process_new_files(conn)
+        print("Verification completed.")
+        conn.close()
+    
 
 
 asyncio.run(main())
